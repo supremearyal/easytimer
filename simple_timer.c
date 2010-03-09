@@ -1,3 +1,7 @@
+/* A simple timer that goes up to 999 seconds written in C with
+ * SDL. The timer concept here is that from Lazy Foo's Productions
+ * (http://lazyfoo.net/) */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -207,13 +211,9 @@ Uint32 get_ticks_timer(timer *t)
 	if(t->started == TRUE)
 	{
 		if(t->paused == TRUE)
-		{
 			return t->paused_ticks;
-		}
 		else
-		{
 			return SDL_GetTicks() - t->start_ticks;
-		}
 	}
 
 	return 0;
