@@ -3,7 +3,7 @@
 for i in {0..9}
 do
 	convert -background lightblue -fill blue -size 50x100\
-	-font Tuffy-Regular -pointsize 72 -gravity center label:$i\
+	-font Tuffy -pointsize 72 -gravity center label:$i\
 	digit${i}.png
 done
 
