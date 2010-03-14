@@ -106,12 +106,12 @@ int main(int argc, char *argv[])
 			}
 		}
 
-		/* Draw the time. */
 		if(get_ticks_timer(&tim) / 1000 <= MAX_ELAPSE)
 			draw_timer(screen, numbers, &tim);
 		else
 			stop_timer(&tim);
 
+		/* Draw the time. */
 		SDL_Flip(screen);
 
 		SDL_Delay(34);
