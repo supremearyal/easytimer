@@ -1,0 +1,14 @@
+easytimer is a simple timer that (for now) goes up to 999 seconds.
+Right now, it is more of a stopwatch.
+
+COMPILING
+---------
+	- Generate the image for the digit font using gendig.sh.
+		+ imagemagick is needed for this.
+	- Compile the program using the Makefile.
+		+ The SDL, SDL_image and their corresponding development
+		  libraries are needed for compilation.
+
+RUNNING
+-------
+	- Run the easytimer binary.
