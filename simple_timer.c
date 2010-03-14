@@ -11,8 +11,7 @@
 #define TRUE 1
 #define FALSE 0
 
-#define DIGITS 10
-#define MAX_ELAPSE DIGITS * DIGITS * DIGITS - 1
+#define MAX_ELAPSE 999
 #define CHAR_WIDTH 50
 #define CHAR_HEIGHT 100
 
@@ -30,8 +29,8 @@ typedef struct
 	int started;
 } timer;
 
-int clean_up(SDL_Surface **nums, int err);
-int init_digits(SDL_Surface **nums, const char *prefix, const char *ext);
+int clean_up(SDL_Surface *nums, int err);
+int init_font(SDL_Surface **nums, const char *fname);
 
 void init_timer(timer *t);
 void start_timer(timer *t);
@@ -40,12 +39,12 @@ void pause_timer(timer *t);
 void unpause_timer(timer *t);
 Uint32 get_ticks_timer(timer *t);
 
-void draw_timer(SDL_Surface *screen, SDL_Surface **nums, timer *t);
+void draw_timer(SDL_Surface *screen, SDL_Surface *nums, timer *t);
 
 int main(int argc, char *argv[])
 {
 	SDL_Surface *screen;
-	SDL_Surface *numbers[DIGITS];
+	SDL_Surface *numbers;
 	SDL_Event event;
 	
 	timer tim;
@@ -57,19 +56,21 @@ int main(int argc, char *argv[])
 	}
 
 	if((screen = SDL_SetVideoMode(WIDTH, HEIGHT, BPP,
-				SDL_SWSURFACE | SDL_NOFRAME))
-		== NULL)
+		SDL_SWSURFACE | SDL_NOFRAME)) == NULL)
 	{
 		fprintf(stderr, "Couldn't set SDL video mode: %s\n",
 			SDL_GetError());
 		return EXIT_FAILURE;
 	}
 
+	/* Set the title of the window. */
 	SDL_WM_SetCaption(TITLE, TITLE);
 
-	if(init_digits(numbers, "digit", "png") == FALSE)
+	/* Initialize the font image. */
+	if(init_font(&numbers, "numbers.png") == FALSE)
 		return EXIT_FAILURE;
 
+	/* Start the timer. */
 	init_timer(&tim);
 
 	while(TRUE)
@@ -120,50 +121,26 @@ int main(int argc, char *argv[])
 	return EXIT_SUCCESS;
 }
 
-int clean_up(SDL_Surface **nums, int err)
+int clean_up(SDL_Surface *nums, int err)
 {
-	int i;
-
-	for(i = 0; i < DIGITS; i++)
-		SDL_FreeSurface(nums[i]);
-
+	SDL_FreeSurface(nums);
 	SDL_Quit();
 	return err;
 }
 
-int init_digits(SDL_Surface **nums, const char *prefix, const char *ext)
+int init_font(SDL_Surface **nums, const char *fname)
 {
-	char *tmp;
-	int i;
-	
-	/* Allocate a string long enough for prefix plus the number
-	 * plus the extension (and the dot). */
-	tmp = (char *)malloc(sizeof(char) * 
-				(strlen(prefix) + 2 + strlen(ext)));
-
-	if(tmp == NULL)
+	/* Open the file. */
+	if((*nums = IMG_Load(fname)) == NULL)
 	{
-		fprintf(stderr, "Couldn't allocate enough memory.\n");
+		fprintf(stderr, "Couldn't open the font image: %s\n",
+			SDL_GetError());
 		return FALSE;
 	}
-
-	/* Concatenate with a loop and set the surfaces. */
-	for(i = 0; i < DIGITS; i++)
+	else
 	{
-		sprintf(tmp, "%s%d.%s", prefix, i, ext);
-		/* Initialize surface here and if any of them cannot be
-		 * initialized we return false. */
-		if((nums[i] = IMG_Load(tmp)) == NULL)
-		{
-			fprintf(stderr, "Couldn't load a digit (image file): %s\n",
-					SDL_GetError());
-			free(tmp);
-			return FALSE;
-		}
+		return TRUE;
 	}
-	
-	free(tmp);
-	return TRUE;
 }
 
 void init_timer(timer *t)
@@ -219,37 +196,38 @@ Uint32 get_ticks_timer(timer *t)
 	return 0;
 }
 
-void draw_timer(SDL_Surface *screen, SDL_Surface **nums, timer *t)
+void draw_timer(SDL_Surface *screen, SDL_Surface *nums, timer *t)
 {
 	Uint32 secs;
-	SDL_Rect clip_screen;
+	SDL_Rect clip_font, clip_screen;
 
 	/* We want seconds not milliseconds. */
 	secs = get_ticks_timer(t) / 1000;
 
 	/* First digit. */
+	clip_font.x = (secs % 1000) / 100 * CHAR_WIDTH;
+	clip_font.y = 0;
+	clip_font.w = CHAR_WIDTH;
+	clip_font.h = CHAR_HEIGHT;
+
 	clip_screen.x = 0;
 	clip_screen.y = 0;
-	clip_screen.w = CHAR_WIDTH;
-	clip_screen.h = CHAR_HEIGHT;
 
-	SDL_BlitSurface(nums[(secs % 1000) / 100], NULL, screen,
-					&clip_screen);
+	SDL_BlitSurface(nums, &clip_font, screen, &clip_screen);
 
 	/* Second digit. */
+	clip_font.x = (secs % 100) / 10 * CHAR_WIDTH;
+
 	clip_screen.x = CHAR_WIDTH;
 	clip_screen.y = 0;
-	clip_screen.w = CHAR_WIDTH;
-	clip_screen.h = CHAR_HEIGHT;
 	
-	SDL_BlitSurface(nums[(secs % 100) / 10], NULL, screen,
-					&clip_screen);
+	SDL_BlitSurface(nums, &clip_font, screen, &clip_screen);
 
 	/* Third digit. */
+	clip_font.x = (secs % 10) * CHAR_WIDTH;
+
 	clip_screen.x = 2 * CHAR_WIDTH;
 	clip_screen.y = 0;
-	clip_screen.w = CHAR_WIDTH;
-	clip_screen.h = CHAR_HEIGHT;
 
-	SDL_BlitSurface(nums[secs % 10], NULL, screen, &clip_screen);
+	SDL_BlitSurface(nums, &clip_font, screen, &clip_screen);
 }
