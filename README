@@ -1,5 +1,4 @@
 easytimer is a simple timer that (for now) goes up to 999 seconds.
-Right now, it is more of a stopwatch.
 
 COMPILING
 ---------
@@ -12,3 +11,6 @@ COMPILING
 RUNNING
 -------
 	- Run the easytimer binary.
+		+ Press <Return> to start/stop the timer.
+		+ Press <Space> to pause/unpause the timer.
+		+ Press <r> to toggle stopwatch/timer mode.

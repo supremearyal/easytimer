@@ -4,7 +4,6 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 #include <SDL/SDL.h>
 #include <SDL/SDL_image.h>
 
@@ -29,8 +28,18 @@ typedef struct
 	int started;
 } timer;
 
-int clean_up(SDL_Surface *nums, int err);
-int init_font(SDL_Surface **nums, const char *fname);
+typedef struct
+{
+	timer *t;
+	int reverse;
+
+	SDL_Surface *screen;
+	SDL_Surface *numbers;
+	SDL_Event event;
+} timer_data;
+
+int clean_up(timer_data *t, int err);
+int init_font(timer_data *t, const char *fname);
 
 void init_timer(timer *t);
 void start_timer(timer *t);
@@ -39,15 +48,20 @@ void pause_timer(timer *t);
 void unpause_timer(timer *t);
 Uint32 get_ticks_timer(timer *t);
 
-void draw_timer(SDL_Surface *screen, SDL_Surface *nums, timer *t);
+void draw_timer(timer_data *t);
 
 int main(int argc, char *argv[])
 {
-	SDL_Surface *screen;
-	SDL_Surface *numbers;
-	SDL_Event event;
-	
-	timer tim;
+	timer_data tdata;
+
+	if((tdata.t = (timer *)malloc(sizeof(timer))) == NULL)
+	{
+		fprintf(stderr, "Couldn't allocate enough memory for timer.\n");
+		return EXIT_FAILURE;
+	}
+	tdata.reverse = FALSE;
+	tdata.screen = NULL;
+	tdata.numbers = NULL;
 
 	if(SDL_Init(SDL_INIT_VIDEO) != 0)
 	{
@@ -55,7 +69,7 @@ int main(int argc, char *argv[])
 		return EXIT_FAILURE;
 	}
 
-	if((screen = SDL_SetVideoMode(WIDTH, HEIGHT, BPP,
+	if((tdata.screen = SDL_SetVideoMode(WIDTH, HEIGHT, BPP,
 		SDL_SWSURFACE | SDL_NOFRAME)) == NULL)
 	{
 		fprintf(stderr, "Couldn't set SDL video mode: %s\n",
@@ -67,53 +81,62 @@ int main(int argc, char *argv[])
 	SDL_WM_SetCaption(TITLE, TITLE);
 
 	/* Initialize the font image. */
-	if(init_font(&numbers, "numbers.png") == FALSE)
+	if(init_font(&tdata, "numbers.png") == FALSE)
+	{
+		fprintf(stderr, "Couldn't open the font image: %s\n",
+			SDL_GetError());
 		return EXIT_FAILURE;
+	}
 
 	/* Start the timer. */
-	init_timer(&tim);
+	init_timer(tdata.t);
 
 	while(TRUE)
 	{
 		/* Handle events here. */
-		while(SDL_PollEvent(&event))
+		while(SDL_PollEvent(&(tdata.event)))
 		{
-			if(event.type == SDL_QUIT)
+			if(tdata.event.type == SDL_QUIT)
 			{
-				return clean_up(numbers, EXIT_SUCCESS);
+				return clean_up(&tdata, EXIT_SUCCESS);
 			}
-			else if(event.type == SDL_KEYDOWN)
+			else if(tdata.event.type == SDL_KEYDOWN)
 			{
-				if(event.key.keysym.sym == SDLK_ESCAPE)
+				if(tdata.event.key.keysym.sym == SDLK_ESCAPE)
 				{
-					return clean_up(numbers, EXIT_SUCCESS);
+					return clean_up(&tdata, EXIT_SUCCESS);
 				}
-				else if(event.key.keysym.sym == SDLK_SPACE)
+				else if(tdata.event.key.keysym.sym == SDLK_r)
+				{
+					tdata.reverse = (tdata.reverse == TRUE) ? FALSE :
+						TRUE;
+				}
+				else if(tdata.event.key.keysym.sym == SDLK_SPACE)
 				{
 					/* Toggle timer here. */
-					if(tim.paused == FALSE)
-						pause_timer(&tim);
+					if(tdata.t->paused == FALSE)
+						pause_timer(tdata.t);
 					else
-						unpause_timer(&tim);
+						unpause_timer(tdata.t);
 				}
-				else if(event.key.keysym.sym == SDLK_RETURN)
+				else if(tdata.event.key.keysym.sym == SDLK_RETURN)
 				{
 					/* Reset timer here. */
-					if(tim.started == FALSE)
-						start_timer(&tim);
+					if(tdata.t->started == FALSE)
+						start_timer(tdata.t);
 					else
-						stop_timer(&tim);
+						stop_timer(tdata.t);
 				}
 			}
 		}
 
-		if(get_ticks_timer(&tim) / 1000 <= MAX_ELAPSE)
-			draw_timer(screen, numbers, &tim);
+		if(get_ticks_timer(tdata.t) / 1000 <= MAX_ELAPSE)
+			draw_timer(&tdata);
 		else
-			stop_timer(&tim);
+			stop_timer(tdata.t);
 
 		/* Draw the time. */
-		SDL_Flip(screen);
+		SDL_Flip(tdata.screen);
 
 		SDL_Delay(34);
 	}
@@ -121,26 +144,21 @@ int main(int argc, char *argv[])
 	return EXIT_SUCCESS;
 }
 
-int clean_up(SDL_Surface *nums, int err)
+int clean_up(timer_data *t, int err)
 {
-	SDL_FreeSurface(nums);
+	free(t->t);
+	SDL_FreeSurface(t->numbers);
 	SDL_Quit();
 	return err;
 }
 
-int init_font(SDL_Surface **nums, const char *fname)
+int init_font(timer_data *t, const char *fname)
 {
 	/* Open the file. */
-	if((*nums = IMG_Load(fname)) == NULL)
-	{
-		fprintf(stderr, "Couldn't open the font image: %s\n",
-			SDL_GetError());
+	if((t->numbers = IMG_Load(fname)) == NULL)
 		return FALSE;
-	}
 	else
-	{
 		return TRUE;
-	}
 }
 
 void init_timer(timer *t)
@@ -196,13 +214,16 @@ Uint32 get_ticks_timer(timer *t)
 	return 0;
 }
 
-void draw_timer(SDL_Surface *screen, SDL_Surface *nums, timer *t)
+void draw_timer(timer_data *t)
 {
 	Uint32 secs;
 	SDL_Rect clip_font, clip_screen;
 
 	/* We want seconds not milliseconds. */
-	secs = get_ticks_timer(t) / 1000;
+	if(t->reverse == TRUE)
+		secs = MAX_ELAPSE - get_ticks_timer(t->t) / 1000;
+	else
+		secs = get_ticks_timer(t->t) / 1000;
 
 	/* First digit. */
 	clip_font.x = (secs % 1000) / 100 * CHAR_WIDTH;
@@ -213,7 +234,7 @@ void draw_timer(SDL_Surface *screen, SDL_Surface *nums, timer *t)
 	clip_screen.x = 0;
 	clip_screen.y = 0;
 
-	SDL_BlitSurface(nums, &clip_font, screen, &clip_screen);
+	SDL_BlitSurface(t->numbers, &clip_font, t->screen, &clip_screen);
 
 	/* Second digit. */
 	clip_font.x = (secs % 100) / 10 * CHAR_WIDTH;
@@ -221,7 +242,7 @@ void draw_timer(SDL_Surface *screen, SDL_Surface *nums, timer *t)
 	clip_screen.x = CHAR_WIDTH;
 	clip_screen.y = 0;
 	
-	SDL_BlitSurface(nums, &clip_font, screen, &clip_screen);
+	SDL_BlitSurface(t->numbers, &clip_font, t->screen, &clip_screen);
 
 	/* Third digit. */
 	clip_font.x = (secs % 10) * CHAR_WIDTH;
@@ -229,5 +250,5 @@ void draw_timer(SDL_Surface *screen, SDL_Surface *nums, timer *t)
 	clip_screen.x = 2 * CHAR_WIDTH;
 	clip_screen.y = 0;
 
-	SDL_BlitSurface(nums, &clip_font, screen, &clip_screen);
+	SDL_BlitSurface(t->numbers, &clip_font, t->screen, &clip_screen);
 }
